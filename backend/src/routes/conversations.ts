@@ -5,6 +5,8 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { hashIp, clientIp } from '../lib/crypto.js';
 import { anonAuth } from '../middleware/anonAuth.js';
 import { notifyNewActivity } from '../services/notify.js';
+import { bus, emitLead, emitClientMessage, type MessageEvent } from '../services/bus.js';
+import { openSseStream } from '../lib/sse.js';
 
 export const conversationsRouter = Router();
 
@@ -46,6 +48,7 @@ conversationsRouter.post(
 
     // fire-and-forget: не задерживаем ответ
     void notifyNewActivity(conversation, null);
+    emitLead(conversation);
 
     res.status(201).json({
       conversationId: conversation.id,
@@ -117,7 +120,34 @@ conversationsRouter.post(
     });
 
     void notifyNewActivity(conv, message);
+    emitClientMessage(conv.id, message);
 
     res.status(201).json({ message });
+  }),
+);
+
+/**
+ * GET /api/conversations/:id/stream  (SSE)
+ * Поток новых ADMIN-сообщений для клиента.
+ * EventSource не умеет заголовки → токен передаётся как ?token=.
+ */
+conversationsRouter.get(
+  '/:id/stream',
+  asyncHandler(async (req, res) => {
+    const token = String(req.query.token ?? '');
+    const conv = await prisma.conversation.findUnique({ where: { id: req.params.id } });
+    if (!conv || !token || conv.anonToken !== token) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+
+    const { send, onClose } = openSseStream(req, res);
+    send('ready', { conversationId: conv.id });
+
+    const onAdminMessage = (e: MessageEvent) => {
+      if (e.conversationId === conv.id) send('message', e.message);
+    };
+    bus.on('admin-message', onAdminMessage);
+    onClose(() => bus.off('admin-message', onAdminMessage));
   }),
 );

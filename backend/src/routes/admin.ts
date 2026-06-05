@@ -9,6 +9,8 @@ import {
   setAuthCookie,
   clearAuthCookie,
 } from '../lib/auth.js';
+import { bus, emitAdminMessage, type LeadEvent, type MessageEvent } from '../services/bus.js';
+import { openSseStream } from '../lib/sse.js';
 
 export const adminRouter = Router();
 
@@ -138,9 +140,31 @@ adminRouter.post(
       return msg;
     });
 
+    emitAdminMessage(conv.id, message);
     res.status(201).json({ message });
   }),
 );
+
+/**
+ * GET /api/admin/stream  (SSE)
+ * Поток новых лидов и клиентских сообщений в реальном времени.
+ * Авторизация — по httpOnly-cookie (adminAuth уже применён выше).
+ */
+adminRouter.get('/stream', (req, res) => {
+  const { send, onClose } = openSseStream(req, res);
+  send('ready', { ok: true });
+
+  const onLead = (e: LeadEvent) => send('lead', e.conversation);
+  const onClientMessage = (e: MessageEvent) =>
+    send('message', { conversationId: e.conversationId, message: e.message });
+
+  bus.on('lead', onLead);
+  bus.on('client-message', onClientMessage);
+  onClose(() => {
+    bus.off('lead', onLead);
+    bus.off('client-message', onClientMessage);
+  });
+});
 
 const patchSchema = z.object({
   status: z.enum(['NEW', 'IN_PROGRESS', 'CLOSED']),
