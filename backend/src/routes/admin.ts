@@ -73,6 +73,7 @@ adminRouter.get(
     const conversations = await prisma.conversation.findMany({
       where,
       orderBy: { lastMessageAt: 'desc' },
+      omit: { anonToken: true, ipHash: true }, // клиентский ключ доступа админке не нужен
       include: {
         _count: { select: { messages: true } },
         messages: { orderBy: { createdAt: 'desc' }, take: 1 }, // превью последнего
@@ -88,6 +89,7 @@ adminRouter.get(
   asyncHandler(async (req, res) => {
     const conversation = await prisma.conversation.findUnique({
       where: { id: req.params.id },
+      omit: { anonToken: true, ipHash: true },
       include: {
         messages: { orderBy: { createdAt: 'asc' }, include: { attachments: true } },
         attachments: true,
@@ -154,7 +156,10 @@ adminRouter.get('/stream', (req, res) => {
   const { send, onClose } = openSseStream(req, res);
   send('ready', { ok: true });
 
-  const onLead = (e: LeadEvent) => send('lead', e.conversation);
+  const onLead = (e: LeadEvent) => {
+    const { anonToken: _t, ipHash: _h, ...safe } = e.conversation;
+    send('lead', safe);
+  };
   const onClientMessage = (e: MessageEvent) =>
     send('message', { conversationId: e.conversationId, message: e.message });
 

@@ -102,7 +102,8 @@
   </div>
 
   <div class="composer" id="composer" style="display:none">
-    <button class="clip" aria-label="Прикрепить файл">📎</button>
+    <button class="clip" id="clip" aria-label="Прикрепить файл">📎</button>
+    <input type="file" id="file" accept="image/png,image/jpeg,image/webp,application/pdf" hidden>
     <input id="msg" placeholder="Напишите сообщение…">
     <button class="send" id="send" aria-label="Отправить">
       <svg viewBox="0 0 24 24" fill="none" stroke="#0b121c" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
@@ -112,10 +113,10 @@
 
 <script>
 /* ============================================================
-   ПРОТОТИП. Здесь данные мокаются. Точки подключения к API
-   помечены [API] — замени fetch-заглушки на реальные вызовы
-   из BACKEND_SPEC.md.
+   Виджет чата NOVA — реальное подключение к API.
+   Бэкенд за nginx по тому же origin → база /api.
    ============================================================ */
+const API = '/api';
 const $ = s => document.querySelector(s);
 const launcher=$('#launcher'), widget=$('#widget');
 launcher.onclick=()=>{widget.classList.remove('hidden');launcher.style.display='none';};
@@ -124,23 +125,59 @@ $('#close').onclick=()=>{widget.classList.add('hidden');launcher.style.display='
 // anonToken хранится в localStorage — клиент возвращается к своей переписке
 let anonToken = localStorage.getItem('nova_anon') || null;
 let convId = localStorage.getItem('nova_conv') || null;
+let pendingAttachments = []; // id уже загруженных, но ещё не отправленных вложений
+let es = null;               // EventSource
 
-function now(){return new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});}
+function fmt(ts){return new Date(ts||Date.now()).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});}
+const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
-function addBubble(side, text, time, attachName){
+// рендер одного сообщения (объект с фронта или из API)
+function addBubble(sender, body, ts, attachments){
+  const side = sender==='ADMIN' ? 'admin' : 'client';
   const t=$('#thread');
   const b=document.createElement('div');
   b.className='bubble '+side;
-  b.innerHTML = text.replace(/</g,'&lt;');
-  if(attachName){
-    const a=document.createElement('div');a.className='attach';
-    a.innerHTML='<span>🖼</span> '+attachName;
-    b.appendChild(a);
-  }
-  const tm=document.createElement('div');tm.className='time';tm.textContent=time+(side==='admin'?' · NOVA':'');
+  b.innerHTML = esc(body);
+  (attachments||[]).forEach(a=>{
+    const el=document.createElement('div');el.className='attach';
+    const isImg=(a.mimeType||'').startsWith('image/');
+    el.innerHTML=`<span>${isImg?'🖼':'📄'}</span> <a href="${API}/uploads/${a.id}" target="_blank" rel="noopener" style="color:inherit">${esc(a.fileName||'файл')}</a>`;
+    b.appendChild(el);
+  });
+  const tm=document.createElement('div');tm.className='time';tm.textContent=fmt(ts)+(side==='admin'?' · NOVA':'');
   b.appendChild(tm);
   t.appendChild(b);
   $('#body').scrollTop=$('#body').scrollHeight;
+}
+
+// переключение в режим диалога
+function enterThread(){
+  $('#intake').style.display='none';
+  $('#thread').style.display='flex';
+  $('#composer').style.display='flex';
+}
+
+// подписка на ответы оператора через SSE
+function subscribe(){
+  if(es) es.close();
+  es = new EventSource(`${API}/conversations/${convId}/stream?token=${encodeURIComponent(anonToken)}`);
+  es.addEventListener('message', e=>{
+    const m=JSON.parse(e.data);
+    if(m.sender==='ADMIN') addBubble('ADMIN', m.body, m.createdAt, m.attachments);
+  });
+}
+
+// загрузка истории (возврат клиента)
+async function loadHistory(){
+  const r=await fetch(`${API}/conversations/${convId}/messages`,{headers:{'X-Anon-Token':anonToken}});
+  if(!r.ok){ // токен протух/диалог удалён — сбрасываем
+    localStorage.removeItem('nova_anon');localStorage.removeItem('nova_conv');
+    anonToken=convId=null; return false;
+  }
+  const {messages}=await r.json();
+  $('#thread').innerHTML='';
+  messages.forEach(m=>addBubble(m.sender,m.body,m.createdAt,m.attachments));
+  return true;
 }
 
 // СТАРТ ДИАЛОГА — отправка формы-визитки
@@ -148,43 +185,61 @@ $('#start').onclick=async()=>{
   const contact=$('#f-contact').value.trim();
   if(!contact){ $('#f-contact').focus(); $('#f-contact').style.borderColor='#ff4d3d'; return; }
   const payload={
-    clientName:$('#f-name').value.trim(),
+    clientName:$('#f-name').value.trim()||undefined,
     contact, contactType: contact.startsWith('@')?'TELEGRAM':'EMAIL',
-    budget:$('#f-budget').value.trim(),
-    stack:$('#f-stack').value.trim(),
-    ideaSummary:$('#f-idea').value.trim()
+    budget:$('#f-budget').value.trim()||undefined,
+    stack:$('#f-stack').value.trim()||undefined,
+    ideaSummary:$('#f-idea').value.trim()||undefined
   };
-  // [API] POST /api/conversations  → { conversationId, anonToken }
-  // const r = await fetch('/api/conversations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  // const data = await r.json(); anonToken=data.anonToken; convId=data.conversationId;
-  anonToken='demo-token'; convId='demo-conv';                       // мок
+  const r=await fetch(`${API}/conversations`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(!r.ok){ alert('Не удалось начать чат, попробуйте ещё раз'); return; }
+  const data=await r.json(); anonToken=data.anonToken; convId=data.conversationId;
   localStorage.setItem('nova_anon',anonToken);
   localStorage.setItem('nova_conv',convId);
 
-  $('#intake').style.display='none';
-  $('#thread').style.display='flex';
-  $('#composer').style.display='flex';
-  if(payload.ideaSummary) addBubble('client', payload.ideaSummary, now());
-  // автоприветствие (на проде — первое ADMIN-сообщение или автответ)
-  setTimeout(()=>addBubble('admin','Спасибо! Получил вашу заявку, скоро отвечу 🙂', now()),700);
+  enterThread();
+  if(payload.ideaSummary) addBubble('CLIENT', payload.ideaSummary, Date.now());
+  subscribe();
+};
+
+// ЗАГРУЗКА ВЛОЖЕНИЯ
+$('#clip').onclick=()=>$('#file').click();
+$('#file').onchange=async()=>{
+  const f=$('#file').files[0]; if(!f) return;
+  const fd=new FormData(); fd.append('conversationId',convId); fd.append('file',f);
+  const r=await fetch(`${API}/uploads`,{method:'POST',headers:{'X-Anon-Token':anonToken},body:fd});
+  if(!r.ok){ alert('Не удалось загрузить файл'); $('#file').value=''; return; }
+  const {attachmentId}=await r.json();
+  pendingAttachments.push(attachmentId);
+  $('#msg').placeholder=`📎 файл прикреплён (${pendingAttachments.length}) — добавьте текст`;
+  $('#file').value='';
 };
 
 // ОТПРАВКА СООБЩЕНИЯ
-function send(){
-  const v=$('#msg').value.trim(); if(!v) return;
-  addBubble('client', v, now());
-  $('#msg').value='';
-  // [API] POST /api/conversations/:id/messages  (заголовок X-Anon-Token)
-  // fetch(`/api/conversations/${convId}/messages`,{method:'POST',headers:{'Content-Type':'application/json','X-Anon-Token':anonToken},body:JSON.stringify({body:v})});
+async function send(){
+  const v=$('#msg').value.trim();
+  if(!v && !pendingAttachments.length) return;
+  const att=pendingAttachments; pendingAttachments=[];
+  $('#msg').value=''; $('#msg').placeholder='Напишите сообщение…';
+  const r=await fetch(`${API}/conversations/${convId}/messages`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Anon-Token':anonToken},
+    body:JSON.stringify({body:v||'(файл)',attachmentIds:att.length?att:undefined})
+  });
+  if(!r.ok){ alert('Сообщение не отправлено'); return; }
+  const {message}=await r.json();
+  addBubble('CLIENT',message.body,message.createdAt,message.attachments);
 }
 $('#send').onclick=send;
 $('#msg').addEventListener('keydown',e=>{if(e.key==='Enter')send();});
 
-/* [API] РЕАЛТАЙМ: подписка на ответы оператора через SSE
-   const es = new EventSource(`/api/conversations/${convId}/stream`);
-   es.onmessage = e => { const m=JSON.parse(e.data); if(m.sender==='ADMIN') addBubble('admin', m.body, now()); };
-   На старте можно заменить на поллинг GET /messages раз в 4 сек.
-*/
+// при загрузке — если есть сохранённая сессия, восстановим диалог
+(async()=>{
+  if(convId && anonToken){
+    const ok=await loadHistory();
+    if(ok){ enterThread(); subscribe(); }
+  }
+})();
 </script>
 </body>
 </html>

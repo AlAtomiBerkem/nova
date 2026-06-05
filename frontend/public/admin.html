@@ -58,10 +58,31 @@
   .reply input:focus{outline:none;border-color:var(--accent)}
   .reply .send{background:var(--accent);color:#0b121c;border:none;border-radius:9px;height:38px;padding:0 18px;display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--display);font-weight:600;font-size:13px}
   .empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-family:var(--mono);font-size:13px}
+
+  /* экран логина */
+  .login{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center}
+  .login form{width:320px;display:flex;flex-direction:column;gap:12px;padding:28px;border:1px solid var(--line);border-radius:16px;background:var(--bg-soft)}
+  .login .logo{font-family:var(--display);font-weight:700;font-size:24px;text-align:center;margin-bottom:6px}
+  .login .logo span{color:var(--accent)}
+  .login input{background:var(--bg-card);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-family:var(--body);font-size:14px;padding:11px 14px}
+  .login input:focus{outline:none;border-color:var(--accent)}
+  .login button{background:var(--accent);color:#0b121c;border:none;border-radius:10px;padding:12px;font-family:var(--mono);font-weight:700;text-transform:uppercase;letter-spacing:.05em;cursor:pointer}
+  .login .err{color:#ff4d3d;font-family:var(--mono);font-size:12px;text-align:center;min-height:14px}
 </style>
 </head>
 <body>
-<div class="app">
+
+<div class="login" id="login">
+  <form id="login-form">
+    <div class="logo">NO<span>/</span>VA</div>
+    <input id="login-email" type="email" placeholder="email" autocomplete="username" required>
+    <input id="login-pass" type="password" placeholder="пароль" autocomplete="current-password" required>
+    <div class="err" id="login-err"></div>
+    <button type="submit">Войти</button>
+  </form>
+</div>
+
+<div class="app" id="app" style="display:none">
 
   <aside class="side">
     <div class="brand">
@@ -90,87 +111,145 @@
 
 <script>
 /* ============================================================
-   ПРОТОТИП админки. Данные мокнуты. Точки [API] — подключить
-   к админским эндпоинтам из BACKEND_SPEC.md (нужен JWT).
+   Админка NOVA — реальное подключение к /api/admin/* (JWT в cookie).
    ============================================================ */
+const API='/api';
 const $ = s=>document.querySelector(s);
-
-// МОК-данные. На проде: [API] GET /api/admin/conversations?status=
-const LEADS = [
-  { id:'1', name:'Алекс', contact:'@alex_dev', contactType:'telegram', budget:'до 1500 €', stack:'React, Three.js', status:'new', unread:true, time:'14:32',
-    messages:[
-      {side:'client', body:'Привет! Хочу лендинг с 3D-фоном как у вас. Прикладываю референс.', time:'14:32', attach:'reference_hero.png'},
-    ]},
-  { id:'2', name:'Марина', contact:'marina@shop.ru', contactType:'email', budget:'обсудим', stack:'—', status:'new', unread:true, time:'13:05',
-    messages:[ {side:'client', body:'Нужен интернет-магазин на 200 товаров. Есть дизайн в Figma.', time:'13:05'} ]},
-  { id:'3', name:'Дмитрий', contact:'@dmexec', contactType:'telegram', budget:'5000 €', stack:'Next.js', status:'progress', unread:false, time:'11:20',
-    messages:[ {side:'client', body:'Когда сможем созвониться по проекту?', time:'11:20'}, {side:'admin', body:'Завтра в 15:00 удобно?', time:'11:45'} ]},
-  { id:'4', name:'Олег', contact:'oleg@mail.com', contactType:'email', budget:'1000 €', stack:'—', status:'closed', unread:false, time:'вчера',
-    messages:[ {side:'client', body:'Спасибо, всё отлично!', time:'вчера'} ]},
-];
+const FILTER_TO_STATUS={new:'NEW',progress:'IN_PROGRESS',closed:'CLOSED'};
 
 let activeFilter='new', activeId=null;
+let leads=[];          // текущий список (по фильтру)
+let es=null;           // EventSource админского потока
 
+const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const fmt=ts=>new Date(ts).toLocaleString('ru',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+const nameOf=l=>l.clientName||l.contact||'Без имени';
+
+// ---------- ЛОГИН ----------
+async function checkAuth(){
+  const r=await fetch(`${API}/admin/me`,{credentials:'include'});
+  return r.ok;
+}
+$('#login-form').onsubmit=async e=>{
+  e.preventDefault();
+  $('#login-err').textContent='';
+  const r=await fetch(`${API}/admin/login`,{
+    method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:$('#login-email').value,password:$('#login-pass').value})
+  });
+  if(!r.ok){ $('#login-err').textContent='Неверный email или пароль'; return; }
+  startApp();
+};
+
+// ---------- СПИСОК ЛИДОВ ----------
+async function loadLeads(){
+  const status=FILTER_TO_STATUS[activeFilter];
+  const r=await fetch(`${API}/admin/conversations?status=${status}`,{credentials:'include'});
+  if(r.status===401){ location.reload(); return; }
+  const {conversations}=await r.json();
+  leads=conversations;
+  renderLeads();
+}
+function isUnread(l){ const m=l.messages&&l.messages[0]; return !!(m&&m.sender==='CLIENT'&&!m.readAt); }
 function renderLeads(){
-  const map={new:'new',progress:'progress',closed:'closed'};
-  const list=LEADS.filter(l=>l.status===map[activeFilter]);
-  $('#cnt-new').textContent = LEADS.filter(l=>l.status==='new').length;
-  $('#leads').innerHTML = list.map(l=>`
-    <div class="lead ${l.unread?'unread':''} ${l.id===activeId?'active':''}" data-id="${l.id}">
-      <div class="top"><span class="name">${l.name}</span>${l.unread?'<span class="undot"></span>':''}</div>
-      <div class="preview">${l.messages[l.messages.length-1].body}</div>
-      <div class="meta">${l.budget} · ${l.time}</div>
-    </div>`).join('') || '<div style="padding:20px;color:var(--muted);font-family:var(--mono);font-size:12px">Пусто</div>';
+  if(activeFilter==='new') $('#cnt-new').textContent=leads.length||'';
+  $('#leads').innerHTML = leads.map(l=>{
+    const last=l.messages&&l.messages[0];
+    return `<div class="lead ${isUnread(l)?'unread':''} ${l.id===activeId?'active':''}" data-id="${l.id}">
+      <div class="top"><span class="name">${esc(nameOf(l))}</span>${isUnread(l)?'<span class="undot"></span>':''}</div>
+      <div class="preview">${esc(last?last.body:'—')}</div>
+      <div class="meta">${esc(l.budget||'бюджет —')} · ${fmt(l.lastMessageAt)}</div>
+    </div>`;
+  }).join('') || '<div style="padding:20px;color:var(--muted);font-family:var(--mono);font-size:12px">Пусто</div>';
   document.querySelectorAll('.lead').forEach(el=>el.onclick=()=>openConv(el.dataset.id));
 }
 
-function openConv(id){
+// ---------- ДИАЛОГ ----------
+function bubbleHTML(m){
+  const side=m.sender==='ADMIN'?'admin':'client';
+  const att=(m.attachments||[]).map(a=>{
+    const isImg=(a.mimeType||'').startsWith('image/');
+    return `<div class="attach"><span>${isImg?'🖼':'📄'}</span> <a href="${API}/uploads/${a.id}" target="_blank" rel="noopener" style="color:inherit">${esc(a.fileName||'файл')}</a></div>`;
+  }).join('');
+  return `<div class="bubble ${side}">${esc(m.body)}${att}<div class="time">${fmt(m.createdAt)}${side==='admin'?' · вы':''}</div></div>`;
+}
+async function openConv(id){
   activeId=id;
-  const l=LEADS.find(x=>x.id===id); if(!l)return;
-  l.unread=false;                                  // [API] PATCH пометить прочитанным
+  const r=await fetch(`${API}/admin/conversations/${id}`,{credentials:'include'});
+  if(!r.ok) return;
+  const {conversation:c}=await r.json();
   $('#conv-head').style.display='flex';
   $('#reply').style.display='flex';
   $('#conv-head').innerHTML=`
-    <div class="av">${l.name[0]}</div>
-    <div><div class="n">${l.name}</div><div class="c">${l.contact} · ${l.contactType}</div></div>
-    <div class="tags"><span class="tag budget">${l.budget}</span><span class="tag">${l.stack}</span></div>`;
-  renderThread(l);
-  renderLeads();
-}
-
-function renderThread(l){
-  $('#thread').innerHTML = l.messages.map(m=>`
-    <div class="bubble ${m.side}">${m.body.replace(/</g,'&lt;')}
-      ${m.attach?`<div class="attach"><span>🖼</span> ${m.attach}</div>`:''}
-      <div class="time">${m.time}${m.side==='admin'?' · вы':''}</div>
-    </div>`).join('');
+    <div class="av">${esc(nameOf(c)[0]||'?')}</div>
+    <div><div class="n">${esc(nameOf(c))}</div><div class="c">${esc(c.contact)} · ${esc(c.contactType)}</div></div>
+    <div class="tags">
+      ${c.budget?`<span class="tag budget">${esc(c.budget)}</span>`:''}
+      ${c.stack?`<span class="tag">${esc(c.stack)}</span>`:''}
+      <span class="tag" id="status-toggle" style="cursor:pointer">${c.status==='CLOSED'?'↻ открыть':'✓ закрыть'}</span>
+    </div>`;
+  $('#thread').innerHTML=c.messages.map(bubbleHTML).join('');
   $('#thread').scrollTop=$('#thread').scrollHeight;
+  $('#status-toggle').onclick=()=>setStatus(id, c.status==='CLOSED'?'IN_PROGRESS':'CLOSED');
+  loadLeads(); // обновим счётчики/прочитанность
 }
 
-function reply(){
+async function reply(){
   const v=$('#reply-input').value.trim(); if(!v||!activeId)return;
-  const l=LEADS.find(x=>x.id===activeId);
-  l.messages.push({side:'admin',body:v,time:new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})});
-  if(l.status==='new')l.status='progress';          // первый ответ → в работу
   $('#reply-input').value='';
-  renderThread(l); renderLeads();
-  // [API] POST /api/admin/conversations/:id/messages  (JWT)
+  const r=await fetch(`${API}/admin/conversations/${activeId}/messages`,{
+    method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({body:v})
+  });
+  if(!r.ok){ alert('Не отправлено'); return; }
+  const {message}=await r.json();
+  $('#thread').insertAdjacentHTML('beforeend',bubbleHTML(message));
+  $('#thread').scrollTop=$('#thread').scrollHeight;
+  loadLeads();
 }
 $('#reply-send').onclick=reply;
-$('#reply-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')reply();});
+$('#reply-input').addEventListener('keydown',e=>{if(e.key==='Enter')reply();});
 
+async function setStatus(id,status){
+  await fetch(`${API}/admin/conversations/${id}`,{
+    method:'PATCH',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status})
+  });
+  openConv(id);
+}
+
+// ---------- ФИЛЬТРЫ ----------
 document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
   document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
-  c.classList.add('active'); activeFilter=c.dataset.f; renderLeads();
+  c.classList.add('active'); activeFilter=c.dataset.f; loadLeads();
 });
 
-renderLeads();
+// ---------- SSE: новые лиды и сообщения ----------
+function subscribe(){
+  if(es) es.close();
+  es=new EventSource(`${API}/admin/stream`,{withCredentials:true});
+  es.addEventListener('lead',()=>loadLeads());
+  es.addEventListener('message',e=>{
+    const {conversationId,message}=JSON.parse(e.data);
+    if(conversationId===activeId && message.sender==='CLIENT'){
+      $('#thread').insertAdjacentHTML('beforeend',bubbleHTML(message));
+      $('#thread').scrollTop=$('#thread').scrollHeight;
+    }
+    loadLeads();
+  });
+}
 
-/* [API] РЕАЛТАЙМ новых лидов:
-   const es=new EventSource('/api/admin/stream');
-   es.onmessage=e=>{ const lead=JSON.parse(e.data); LEADS.unshift(lead); renderLeads(); notify(lead); };
-   [API] PUSH: запросить разрешение и POST /api/admin/push/subscribe
-*/
+// ---------- запуск ----------
+async function startApp(){
+  $('#login').style.display='none';
+  $('#app').style.display='grid';
+  await loadLeads();
+  subscribe();
+}
+(async()=>{ if(await checkAuth()) startApp(); else $('#login').style.display='flex'; })();
 </script>
 </body>
 </html>
