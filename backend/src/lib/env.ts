@@ -37,4 +37,30 @@ export const env = {
   // куда складывать загруженные файлы (на старте — локальная папка)
   uploadDir: optional('UPLOAD_DIR', './uploads'),
   maxUploadBytes: Number(optional('MAX_UPLOAD_BYTES', String(10 * 1024 * 1024))),
+
+  // публичный URL админки — для ссылок в уведомлениях
+  adminUrl: optional('ADMIN_URL', 'http://localhost:8080/admin.html'),
+
+  // --- уведомления (Этап 7), все опциональны: канал активен только при наличии ключей ---
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
+    chatId: process.env.TELEGRAM_CHAT_ID ?? '',
+  },
+  vapid: {
+    publicKey: process.env.VAPID_PUBLIC_KEY ?? '',
+    privateKey: process.env.VAPID_PRIVATE_KEY ?? '',
+    subject: optional('VAPID_SUBJECT', 'mailto:admin@nova.local'),
+  },
+  resend: {
+    apiKey: process.env.RESEND_API_KEY ?? '',
+    from: optional('RESEND_FROM', 'NOVA <onboarding@resend.dev>'),
+    to: process.env.RESEND_TO ?? '',
+  },
+
+  // --- антиспам (Этап 8) ---
+  rateLimit: {
+    windowMs: Number(optional('RATE_WINDOW_MS', '60000')),
+    max: Number(optional('RATE_MAX', '10')), // сообщений/лидов с одного ipHash за окно
+  },
+  turnstileSecret: process.env.TURNSTILE_SECRET ?? '',
 };

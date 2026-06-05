@@ -11,6 +11,7 @@ import {
 } from '../lib/auth.js';
 import { bus, emitAdminMessage, type LeadEvent, type MessageEvent } from '../services/bus.js';
 import { openSseStream } from '../lib/sse.js';
+import { env } from '../lib/env.js';
 
 export const adminRouter = Router();
 
@@ -170,6 +171,35 @@ adminRouter.get('/stream', (req, res) => {
     bus.off('client-message', onClientMessage);
   });
 });
+
+/** GET /api/admin/push/vapid → публичный VAPID-ключ для подписки в браузере. */
+adminRouter.get('/push/vapid', (_req, res) => {
+  res.json({ publicKey: env.vapid.publicKey || null });
+});
+
+const subscribeSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({ p256dh: z.string(), auth: z.string() }),
+});
+
+/** POST /api/admin/push/subscribe → сохранить PushSubscription текущего админа. */
+adminRouter.post(
+  '/push/subscribe',
+  asyncHandler(async (req, res) => {
+    const parsed = subscribeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation' });
+      return;
+    }
+    const { endpoint, keys } = parsed.data;
+    await prisma.pushSubscription.upsert({
+      where: { endpoint },
+      update: { p256dh: keys.p256dh, auth: keys.auth, adminId: req.admin!.sub },
+      create: { endpoint, p256dh: keys.p256dh, auth: keys.auth, adminId: req.admin!.sub },
+    });
+    res.status(201).json({ ok: true });
+  }),
+);
 
 const patchSchema = z.object({
   status: z.enum(['NEW', 'IN_PROGRESS', 'CLOSED']),

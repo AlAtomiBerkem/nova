@@ -242,6 +242,31 @@ function subscribe(){
   });
 }
 
+// ---------- WEB-PUSH ----------
+const urlB64ToUint8=b64=>{
+  const pad='='.repeat((4-b64.length%4)%4);
+  const raw=atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/'));
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+};
+async function setupPush(){
+  if(!('serviceWorker'in navigator)||!('PushManager'in window)){ alert('Push не поддерживается этим браузером'); return; }
+  const vr=await fetch(`${API}/admin/push/vapid`,{credentials:'include'});
+  const {publicKey}=await vr.json();
+  if(!publicKey){ alert('VAPID-ключи не настроены на сервере'); return; }
+  const perm=await Notification.requestPermission();
+  if(perm!=='granted'){ return; }
+  const reg=await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
+  const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(publicKey)});
+  await fetch(`${API}/admin/push/subscribe`,{
+    method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(sub.toJSON())
+  });
+  $('.bell').textContent='🔔✓'; $('.bell').title='Push-уведомления включены';
+}
+$('.bell').onclick=setupPush;
+
 // ---------- запуск ----------
 async function startApp(){
   $('#login').style.display='none';

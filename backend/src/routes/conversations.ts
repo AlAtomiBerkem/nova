@@ -7,6 +7,8 @@ import { anonAuth } from '../middleware/anonAuth.js';
 import { notifyNewActivity } from '../services/notify.js';
 import { bus, emitLead, emitClientMessage, type MessageEvent } from '../services/bus.js';
 import { openSseStream } from '../lib/sse.js';
+import { rateLimit } from '../middleware/rateLimit.js';
+import { verifyTurnstile } from '../lib/turnstile.js';
 
 export const conversationsRouter = Router();
 
@@ -31,7 +33,13 @@ const createMessageSchema = z.object({
  */
 conversationsRouter.post(
   '/',
+  rateLimit,
   asyncHandler(async (req, res) => {
+    // капча на первый контакт (если включена)
+    if (!(await verifyTurnstile(req))) {
+      res.status(403).json({ error: 'captcha_failed' });
+      return;
+    }
     const parsed = createConversationSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'validation', issues: parsed.error.flatten() });
@@ -80,6 +88,7 @@ conversationsRouter.get(
  */
 conversationsRouter.post(
   '/:id/messages',
+  rateLimit,
   anonAuth,
   asyncHandler(async (req, res) => {
     const parsed = createMessageSchema.safeParse(req.body);

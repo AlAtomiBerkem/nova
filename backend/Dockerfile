@@ -36,5 +36,5 @@ RUN mkdir -p /app/uploads
 
 EXPOSE 4000
 
-# на старте применяем миграции, затем поднимаем сервер
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# на старте: миграции → создание админа (если заданы креды) → сервер
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/seedAdmin.js && node dist/index.js"]

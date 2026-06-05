@@ -33,6 +33,24 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
       IP_HASH_SALT: ${IP_HASH_SALT:-change-me}
       UPLOAD_DIR: /app/uploads
+      ADMIN_URL: ${ADMIN_URL:-http://localhost:8080/admin.html}
+      # сидер админа на старте
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-NOVA}
+      # уведомления (пусто = канал выключен)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@nova.local}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
+      RESEND_TO: ${RESEND_TO:-}
+      # антиспам
+      RATE_WINDOW_MS: ${RATE_WINDOW_MS:-60000}
+      RATE_MAX: ${RATE_MAX:-10}
+      TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
     volumes:
       - uploads:/app/uploads
     expose:
