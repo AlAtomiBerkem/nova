@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import { env } from './lib/env.js';
 import { prisma } from './lib/prisma.js';
 import { conversationsRouter } from './routes/conversations.js';
+import { uploadsRouter } from './routes/uploads.js';
 
 const app = express();
 
@@ -31,7 +32,7 @@ app.get('/api/health', async (_req, res) => {
 
 // --- публичное API ---
 app.use('/api/conversations', conversationsRouter);
-// app.use('/api/uploads', uploadsRouter);   // Этап 3
+app.use('/api/uploads', uploadsRouter);
 // app.use('/api/admin', adminRouter);        // Этап 4
 
 // --- 404 для неизвестных /api ---
