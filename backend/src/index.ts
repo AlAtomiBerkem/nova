@@ -5,6 +5,7 @@ import { env } from './lib/env.js';
 import { prisma } from './lib/prisma.js';
 import { conversationsRouter } from './routes/conversations.js';
 import { uploadsRouter } from './routes/uploads.js';
+import { adminRouter } from './routes/admin.js';
 
 const app = express();
 
@@ -33,7 +34,7 @@ app.get('/api/health', async (_req, res) => {
 // --- публичное API ---
 app.use('/api/conversations', conversationsRouter);
 app.use('/api/uploads', uploadsRouter);
-// app.use('/api/admin', adminRouter);        // Этап 4
+app.use('/api/admin', adminRouter);
 
 // --- 404 для неизвестных /api ---
 app.use('/api', (_req, res) => {
