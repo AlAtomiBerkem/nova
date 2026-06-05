@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOVA — Style Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     NOVA DESIGN TOKENS — единый источник правды.
+     Эти переменные используются на сайте, в чат-виджете и админке.
+     ============================================================ */
+  :root{
+    /* — Цвета — */
+    --bg:#0b121c;            /* основной фон (тёмно-синий) */
+    --bg-soft:#121b29;       /* приподнятые поверхности, ховер */
+    --bg-card:rgba(255,255,255,.04); /* карточки, поля ввода */
+    --ink:#eef2f7;           /* основной текст */
+    --muted:#9aa6b6;         /* вторичный текст, подписи */
+    --line:rgba(238,242,247,.12);    /* границы */
+    --line-soft:rgba(238,242,247,.06);
+    --accent:#d6ff3f;        /* лайм — акцент, CTA, активные состояния */
+    --accent-2:#ff4d3d;      /* коралл — ошибки, удаление */
+    --glow:rgba(214,255,63,.35);
+
+    /* — Шрифты — */
+    --display:'Space Grotesk',sans-serif;                 /* заголовки */
+    --body:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; /* текст */
+    --mono:'Space Mono',monospace;                        /* технические подписи: время, статусы, цифры */
+
+    /* — Радиусы — */
+    --r-sm:8px;
+    --r-md:12px;
+    --r-lg:16px;
+    --r-pill:40px;
+
+    /* — Отступы (шкала) — */
+    --sp-1:6px; --sp-2:10px; --sp-3:14px; --sp-4:20px; --sp-5:28px; --sp-6:40px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.5;padding:48px 32px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:0 auto}
+  h1{font-family:var(--display);font-weight:700;font-size:clamp(34px,6vw,64px);letter-spacing:-.03em;line-height:.95}
+  h2{font-family:var(--display);font-weight:600;font-size:28px;letter-spacing:-.02em;margin:56px 0 6px}
+  h3{font-family:var(--display);font-weight:600;font-size:18px;margin:24px 0 12px}
+  .lead{color:var(--muted);font-size:18px;max-width:560px;margin-top:16px}
+  .label{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.16em;color:var(--accent);margin-bottom:8px}
+  section{padding:28px 0;border-bottom:1px solid var(--line-soft)}
+  .row{display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+  .grid{display:grid;gap:16px}
+
+  /* — Swatch цветов — */
+  .swatches{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .sw{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+  .sw .chip{height:72px}
+  .sw .meta{padding:10px 12px;font-family:var(--mono);font-size:12px}
+  .sw .meta b{display:block;font-family:var(--body);font-size:13px;margin-bottom:2px;font-weight:600}
+  .sw .meta span{color:var(--muted)}
+
+  /* — Кнопки (каноничные) — */
+  .btn{font-family:var(--mono);font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+    padding:14px 26px;border-radius:var(--r-pill);display:inline-flex;align-items:center;gap:10px;border:1px solid var(--line);
+    background:transparent;color:var(--ink);cursor:pointer;transition:.3s}
+  .btn-primary{background:var(--accent);color:#000;border-color:var(--accent)}
+  .btn-primary:hover{box-shadow:0 0 40px var(--glow)}
+  .btn-ghost{background:linear-gradient(135deg,rgba(20,20,24,.55),rgba(12,12,15,.4));border-color:var(--ink)}
+  .btn-ghost:hover{background:var(--accent);color:#000;border-color:var(--accent);box-shadow:0 0 40px var(--glow)}
+
+  /* — Поля ввода — */
+  .field label{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:6px}
+  .field input,.field textarea{width:100%;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-sm);
+    color:var(--ink);font-family:var(--body);font-size:15px;padding:11px 14px;transition:border .3s}
+  .field input:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
+  .field input::placeholder{color:#6b7585}
+
+  /* — Бейджи статусов — */
+  .badge{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:5px 12px;border-radius:var(--r-pill);border:1px solid var(--line);color:var(--muted)}
+  .badge.accent{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+  .badge.new{color:var(--accent);border-color:rgba(214,255,63,.4)}
+
+  /* — Пузыри чата — */
+  .bubbles{max-width:520px}
+  .bubble{padding:11px 14px;font-size:14px;line-height:1.5;margin-bottom:10px;max-width:78%}
+  .bubble.client{align-self:flex-start;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px 14px 14px 4px;margin-right:auto}
+  .bubble.admin{align-self:flex-end;background:var(--accent);color:#000;font-weight:500;border-radius:14px 14px 4px 14px;margin-left:auto}
+  .col{display:flex;flex-direction:column}
+
+  .card{background:var(--bg-soft);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px}
+  code{font-family:var(--mono);font-size:13px;background:var(--bg-soft);padding:2px 7px;border-radius:6px;color:var(--accent)}
+  .note{color:var(--muted);font-size:14px;margin-top:8px}
+  table{width:100%;border-collapse:collapse;margin-top:12px}
+  td,th{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-soft);font-size:14px}
+  th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  td code{font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="label">NOVA · Design System</div>
+  <h1>Style Guidebook</h1>
+  <p class="lead">Единый источник дизайн-токенов и компонентов. Сайт, чат-виджет и админка используют одни и те же переменные из <code>:root</code>.</p>
+
+  <section>
+    <h2>Цвета</h2>
+    <div class="grid swatches">
+      <div class="sw"><div class="chip" style="background:#0b121c"></div><div class="meta"><b>--bg</b><span>#0b121c</span></div></div>
+      <div class="sw"><div class="chip" style="background:#121b29"></div><div class="meta"><b>--bg-soft</b><span>#121b29</span></div></div>
+      <div class="sw"><div class="chip" style="background:#eef2f7"></div><div class="meta"><b>--ink</b><span>#eef2f7</span></div></div>
+      <div class="sw"><div class="chip" style="background:#9aa6b6"></div><div class="meta"><b>--muted</b><span>#9aa6b6</span></div></div>
+      <div class="sw"><div class="chip" style="background:#d6ff3f"></div><div class="meta"><b>--accent</b><span>#d6ff3f лайм</span></div></div>
+      <div class="sw"><div class="chip" style="background:#ff4d3d"></div><div class="meta"><b>--accent-2</b><span>#ff4d3d коралл</span></div></div>
+    </div>
+    <p class="note">Лайм — только для акцентов и действий (CTA, активные состояния, непрочитанное). Коралл — для ошибок и удаления. Не заливать лаймом большие площади.</p>
+  </section>
+
+  <section>
+    <h2>Типографика</h2>
+    <h3>Space Grotesk — заголовки</h3>
+    <div style="font-family:var(--display);font-weight:700;font-size:40px;letter-spacing:-.03em;line-height:.95">Создаю впечатляющие сайты</div>
+    <h3>Системный шрифт — основной текст</h3>
+    <div style="font-size:17px;max-width:520px;color:var(--ink)">Разработка сайтов, приложений и интерфейсов под ключ — от идеи до деплоя.</div>
+    <h3>Space Mono — технические подписи</h3>
+    <div style="font-family:var(--mono);font-size:14px;color:var(--muted)">14:32 · до 1500 € · STATUS: NEW</div>
+    <p class="note">Заголовки — <code>--display</code> вес 700, плотный leading (.95). Текст — <code>--body</code>. Mono — время, цены, статусы, метки секций.</p>
+  </section>
+
+  <section>
+    <h2>Кнопки</h2>
+    <div class="row">
+      <button class="btn btn-primary">Обсудить проект →</button>
+      <button class="btn btn-ghost">Смотреть работы</button>
+    </div>
+    <p class="note">Primary — лаймовая заливка. Ghost — рамка + стекло, на ховере становится лаймовой. Шрифт <code>--mono</code> bold uppercase.</p>
+  </section>
+
+  <section>
+    <h2>Поля ввода</h2>
+    <div class="grid" style="grid-template-columns:1fr 1fr;max-width:560px">
+      <div class="field"><label>Как к вам обращаться</label><input placeholder="Имя"></div>
+      <div class="field"><label>Email или telegram</label><input placeholder="@username" style="border-color:var(--accent)"></div>
+    </div>
+    <p class="note">Фокус и обязательные поля подсвечиваются лаймовой границей.</p>
+  </section>
+
+  <section>
+    <h2>Бейджи статусов</h2>
+    <div class="row">
+      <span class="badge new">Новый</span>
+      <span class="badge">В работе</span>
+      <span class="badge">Закрыт</span>
+      <span class="badge accent">Новые 2</span>
+      <span class="badge">до 1500 €</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Пузыри чата</h2>
+    <div class="col bubbles">
+      <div class="bubble client">Привет! Хочу лендинг с 3D-фоном как у вас на сайте.</div>
+      <div class="bubble admin">Отличная идея! Под бюджет уложимся. Когда нужен запуск?</div>
+    </div>
+    <p class="note">Клиент — слева, полупрозрачный, скруглён слева-снизу остро. Админ (ты) — справа, лаймовый, скруглён справа-снизу остро.</p>
+  </section>
+
+  <section>
+    <h2>Радиусы и отступы</h2>
+    <table>
+      <tr><th>Токен</th><th>Значение</th><th>Где</th></tr>
+      <tr><td><code>--r-sm</code></td><td>8px</td><td>поля ввода, мелкие элементы</td></tr>
+      <tr><td><code>--r-md</code></td><td>12px</td><td>кнопки отправки, чипы</td></tr>
+      <tr><td><code>--r-lg</code></td><td>16px</td><td>карточки, панели, виджет</td></tr>
+      <tr><td><code>--r-pill</code></td><td>40px</td><td>кнопки, бейджи</td></tr>
+    </table>
+    <p class="note">Шкала отступов: <code>--sp-1</code>…<code>--sp-6</code> (6 / 10 / 14 / 20 / 28 / 40px).</p>
+  </section>
+
+  <section style="border:none">
+    <h2>Принципы</h2>
+    <div class="card" style="max-width:620px">
+      <p style="margin-bottom:10px">· Тёмно-синий фон, лайм — точечно.</p>
+      <p style="margin-bottom:10px">· Заголовки плотные (Space Grotesk, leading .95), текст — системный.</p>
+      <p style="margin-bottom:10px">· Технические данные (время, цены, статусы) — всегда Space Mono.</p>
+      <p style="margin-bottom:10px">· Границы тонкие (1px, низкая прозрачность). Скругления крупные на карточках.</p>
+      <p>· Анимации сдержанные. Никаких кричащих эффектов кроме лаймового glow на ховере CTA.</p>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

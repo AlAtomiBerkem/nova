@@ -1,0 +1,27 @@
+# зависимости
+node_modules/
+
+# сборка
+dist/
+build/
+
+# окружение и секреты
+.env
+.env.*
+!.env.example
+
+# загрузки пользователей
+uploads/
+backend/uploads/
+
+# логи
+*.log
+npm-debug.log*
+
+# ОС / редакторы
+.DS_Store
+.vscode/
+.idea/
+
+# prisma
+backend/prisma/*.db

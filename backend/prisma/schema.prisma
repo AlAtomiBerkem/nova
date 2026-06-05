@@ -1,0 +1,135 @@
+// ============================================================
+//  NOVA — чат «клиент ↔ исполнитель» + админка
+//  Схема БД для PostgreSQL (Prisma ORM)
+//
+//  Запуск:
+//    1. npm i -D prisma && npm i @prisma/client
+//    2. npx prisma init  (создаст .env с DATABASE_URL)
+//    3. положить этот файл в prisma/schema.prisma
+//    4. npx prisma migrate dev --name init
+//    5. npx prisma generate
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+//  ДИАЛОГ = ЛИД. Создаётся, когда клиент впервые пишет.
+//  Клиенту НЕ нужна регистрация: его «личность» — это anonToken,
+//  который фронт хранит в localStorage и шлёт с каждым запросом.
+// ------------------------------------------------------------
+model Conversation {
+  id            String        @id @default(cuid())
+  anonToken     String        @unique @default(cuid()) // ключ доступа клиента к своей переписке
+  status        Status        @default(NEW)
+
+  // --- визитка лида (заполняется формой перед чатом) ---
+  clientName    String?                                // имя (необязательно)
+  contact       String                                 // email / telegram — ОБЯЗАТЕЛЬНО, иначе лид мёртвый
+  contactType   ContactType   @default(EMAIL)
+  budget        String?                                // свободный текст: "до 1000€", "обсудим"
+  stack         String?                                // желаемый стек/инструменты
+  ideaSummary   String?       @db.Text                 // краткое описание идеи из формы
+
+  // --- служебное ---
+  ipHash        String?                                // хеш IP для антиспама/рейт-лимита
+  userAgent     String?
+  createdAt     DateTime      @default(now())
+  lastMessageAt DateTime      @default(now())          // для сортировки списка в админке
+  closedAt      DateTime?
+
+  messages      Message[]
+  attachments   Attachment[]
+
+  @@index([status, lastMessageAt])
+}
+
+// ------------------------------------------------------------
+//  СООБЩЕНИЕ. sender различает, кто написал.
+// ------------------------------------------------------------
+model Message {
+  id             String        @id @default(cuid())
+  conversationId String
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  sender         Sender                                  // CLIENT | ADMIN
+  body           String        @db.Text
+  createdAt      DateTime      @default(now())
+  readAt         DateTime?                               // когда прочитано противоположной стороной
+
+  attachments    Attachment[]
+
+  @@index([conversationId, createdAt])
+}
+
+// ------------------------------------------------------------
+//  ВЛОЖЕНИЕ (креатив). Сам файл лежит в S3/R2/папке,
+//  в БД — только путь и метаданные.
+// ------------------------------------------------------------
+model Attachment {
+  id             String        @id @default(cuid())
+  conversationId String
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messageId      String?
+  message        Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  url            String                                  // путь/ключ в хранилище
+  fileName       String
+  mimeType       String
+  sizeBytes      Int
+  createdAt      DateTime      @default(now())
+
+  @@index([conversationId])
+}
+
+// ------------------------------------------------------------
+//  АДМИН = ты. Один или несколько.
+// ------------------------------------------------------------
+model AdminUser {
+  id            String              @id @default(cuid())
+  email         String              @unique
+  passwordHash  String                                  // bcrypt
+  displayName   String?
+  createdAt     DateTime            @default(now())
+
+  pushSubs      PushSubscription[]
+}
+
+// ------------------------------------------------------------
+//  ПОДПИСКА НА BROWSER PUSH (Web Push API).
+//  Создаётся, когда ты разрешаешь уведомления в админке.
+// ------------------------------------------------------------
+model PushSubscription {
+  id          String     @id @default(cuid())
+  adminId     String
+  admin       AdminUser  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  endpoint    String     @unique
+  p256dh      String                                    // ключи из PushSubscription.toJSON()
+  auth        String
+  createdAt   DateTime   @default(now())
+}
+
+enum Status {
+  NEW          // новый лид, ещё не отвечал
+  IN_PROGRESS  // в работе
+  CLOSED       // закрыт
+}
+
+enum Sender {
+  CLIENT
+  ADMIN
+}
+
+enum ContactType {
+  EMAIL
+  TELEGRAM
+  PHONE
+  OTHER
+}

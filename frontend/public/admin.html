@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOVA — админка (прототип)</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b121c;--bg-soft:#121b29;--bg-card:rgba(255,255,255,.04);
+    --ink:#eef2f7;--muted:#9aa6b6;--line:rgba(238,242,247,.12);--line-soft:rgba(238,242,247,.06);
+    --accent:#d6ff3f;--glow:rgba(214,255,63,.35);
+    --display:'Space Grotesk',sans-serif;--body:ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--mono:'Space Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--body);height:100vh;overflow:hidden}
+  .app{display:grid;grid-template-columns:300px 1fr;height:100vh}
+
+  /* ЛЕВАЯ КОЛОНКА — список лидов */
+  .side{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+  .brand{padding:18px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .brand .logo{font-family:var(--display);font-weight:700;font-size:19px}
+  .brand .logo span{color:var(--accent)}
+  .brand .sub{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .brand .bell{margin-left:auto;color:var(--accent);font-size:20px;cursor:pointer}
+  .filters{display:flex;gap:6px;padding:12px;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+  .chip{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:5px 12px;border-radius:40px;border:1px solid var(--line);color:var(--muted);cursor:pointer;transition:.2s}
+  .chip.active{background:var(--accent);color:#0b121c;border-color:var(--accent);font-weight:700}
+  .leads{flex:1;overflow-y:auto;min-height:0}
+  .lead{padding:12px 14px;border-bottom:1px solid var(--line-soft);cursor:pointer;transition:.2s}
+  .lead:hover{background:var(--bg-soft)}
+  .lead.active{background:rgba(214,255,63,.06);border-left:2px solid var(--accent);padding-left:12px}
+  .lead .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+  .lead .name{font-family:var(--display);font-weight:600;font-size:14px}
+  .lead .undot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  .lead .preview{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lead .meta{font-family:var(--mono);font-size:10px;margin-top:3px;color:var(--muted)}
+  .lead.unread .meta{color:var(--accent)}
+
+  /* ПРАВАЯ КОЛОНКА — диалог */
+  .main{display:flex;flex-direction:column;min-height:0}
+  .conv-head{padding:12px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .conv-head .av{width:34px;height:34px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;color:#0b121c;font-size:14px}
+  .conv-head .n{font-family:var(--display);font-weight:600;font-size:15px}
+  .conv-head .c{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .conv-head .tags{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  .tag{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:40px;border:1px solid var(--line);color:var(--muted)}
+  .tag.budget{color:var(--accent);border-color:rgba(214,255,63,.4)}
+  .thread{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;min-height:0}
+  .bubble{padding:10px 13px;font-size:14px;line-height:1.5;margin-bottom:10px;max-width:68%}
+  .bubble.client{align-self:flex-start;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px 14px 14px 4px}
+  .bubble.admin{align-self:flex-end;background:var(--accent);color:#0b121c;font-weight:500;border-radius:14px 14px 4px 14px}
+  .bubble .time{font-family:var(--mono);font-size:10px;margin-top:5px;opacity:.6}
+  .bubble.admin .time{color:rgba(11,18,28,.55)}
+  .attach{margin-top:7px;display:flex;align-items:center;gap:7px;background:rgba(214,255,63,.08);border:1px solid rgba(214,255,63,.25);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:11px;color:var(--accent)}
+  .reply{padding:12px 18px;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .reply input{flex:1;background:var(--bg-card);border:1px solid var(--line);border-radius:10px;color:var(--ink);font-family:var(--body);font-size:14px;padding:10px 14px}
+  .reply input:focus{outline:none;border-color:var(--accent)}
+  .reply .send{background:var(--accent);color:#0b121c;border:none;border-radius:9px;height:38px;padding:0 18px;display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--display);font-weight:600;font-size:13px}
+  .empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-family:var(--mono);font-size:13px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">NO<span>/</span>VA</div>
+      <div class="sub">админка</div>
+      <div class="bell" title="Уведомления включены">🔔</div>
+    </div>
+    <div class="filters">
+      <span class="chip active" data-f="new">Новые <span id="cnt-new"></span></span>
+      <span class="chip" data-f="progress">В работе</span>
+      <span class="chip" data-f="closed">Закрытые</span>
+    </div>
+    <div class="leads" id="leads"></div>
+  </aside>
+
+  <main class="main">
+    <div id="conv-head" class="conv-head" style="display:none"></div>
+    <div id="thread" class="thread"><div class="empty">Выберите диалог слева</div></div>
+    <div id="reply" class="reply" style="display:none">
+      <input id="reply-input" placeholder="Ответить…">
+      <button class="send" id="reply-send">Отправить ↑</button>
+    </div>
+  </main>
+
+</div>
+
+<script>
+/* ============================================================
+   ПРОТОТИП админки. Данные мокнуты. Точки [API] — подключить
+   к админским эндпоинтам из BACKEND_SPEC.md (нужен JWT).
+   ============================================================ */
+const $ = s=>document.querySelector(s);
+
+// МОК-данные. На проде: [API] GET /api/admin/conversations?status=
+const LEADS = [
+  { id:'1', name:'Алекс', contact:'@alex_dev', contactType:'telegram', budget:'до 1500 €', stack:'React, Three.js', status:'new', unread:true, time:'14:32',
+    messages:[
+      {side:'client', body:'Привет! Хочу лендинг с 3D-фоном как у вас. Прикладываю референс.', time:'14:32', attach:'reference_hero.png'},
+    ]},
+  { id:'2', name:'Марина', contact:'marina@shop.ru', contactType:'email', budget:'обсудим', stack:'—', status:'new', unread:true, time:'13:05',
+    messages:[ {side:'client', body:'Нужен интернет-магазин на 200 товаров. Есть дизайн в Figma.', time:'13:05'} ]},
+  { id:'3', name:'Дмитрий', contact:'@dmexec', contactType:'telegram', budget:'5000 €', stack:'Next.js', status:'progress', unread:false, time:'11:20',
+    messages:[ {side:'client', body:'Когда сможем созвониться по проекту?', time:'11:20'}, {side:'admin', body:'Завтра в 15:00 удобно?', time:'11:45'} ]},
+  { id:'4', name:'Олег', contact:'oleg@mail.com', contactType:'email', budget:'1000 €', stack:'—', status:'closed', unread:false, time:'вчера',
+    messages:[ {side:'client', body:'Спасибо, всё отлично!', time:'вчера'} ]},
+];
+
+let activeFilter='new', activeId=null;
+
+function renderLeads(){
+  const map={new:'new',progress:'progress',closed:'closed'};
+  const list=LEADS.filter(l=>l.status===map[activeFilter]);
+  $('#cnt-new').textContent = LEADS.filter(l=>l.status==='new').length;
+  $('#leads').innerHTML = list.map(l=>`
+    <div class="lead ${l.unread?'unread':''} ${l.id===activeId?'active':''}" data-id="${l.id}">
+      <div class="top"><span class="name">${l.name}</span>${l.unread?'<span class="undot"></span>':''}</div>
+      <div class="preview">${l.messages[l.messages.length-1].body}</div>
+      <div class="meta">${l.budget} · ${l.time}</div>
+    </div>`).join('') || '<div style="padding:20px;color:var(--muted);font-family:var(--mono);font-size:12px">Пусто</div>';
+  document.querySelectorAll('.lead').forEach(el=>el.onclick=()=>openConv(el.dataset.id));
+}
+
+function openConv(id){
+  activeId=id;
+  const l=LEADS.find(x=>x.id===id); if(!l)return;
+  l.unread=false;                                  // [API] PATCH пометить прочитанным
+  $('#conv-head').style.display='flex';
+  $('#reply').style.display='flex';
+  $('#conv-head').innerHTML=`
+    <div class="av">${l.name[0]}</div>
+    <div><div class="n">${l.name}</div><div class="c">${l.contact} · ${l.contactType}</div></div>
+    <div class="tags"><span class="tag budget">${l.budget}</span><span class="tag">${l.stack}</span></div>`;
+  renderThread(l);
+  renderLeads();
+}
+
+function renderThread(l){
+  $('#thread').innerHTML = l.messages.map(m=>`
+    <div class="bubble ${m.side}">${m.body.replace(/</g,'&lt;')}
+      ${m.attach?`<div class="attach"><span>🖼</span> ${m.attach}</div>`:''}
+      <div class="time">${m.time}${m.side==='admin'?' · вы':''}</div>
+    </div>`).join('');
+  $('#thread').scrollTop=$('#thread').scrollHeight;
+}
+
+function reply(){
+  const v=$('#reply-input').value.trim(); if(!v||!activeId)return;
+  const l=LEADS.find(x=>x.id===activeId);
+  l.messages.push({side:'admin',body:v,time:new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})});
+  if(l.status==='new')l.status='progress';          // первый ответ → в работу
+  $('#reply-input').value='';
+  renderThread(l); renderLeads();
+  // [API] POST /api/admin/conversations/:id/messages  (JWT)
+}
+$('#reply-send').onclick=reply;
+$('#reply-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')reply();});
+
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
+  c.classList.add('active'); activeFilter=c.dataset.f; renderLeads();
+});
+
+renderLeads();
+
+/* [API] РЕАЛТАЙМ новых лидов:
+   const es=new EventSource('/api/admin/stream');
+   es.onmessage=e=>{ const lead=JSON.parse(e.data); LEADS.unshift(lead); renderLeads(); notify(lead); };
+   [API] PUSH: запросить разрешение и POST /api/admin/push/subscribe
+*/
+</script>
+</body>
+</html>
