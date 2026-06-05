@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { env } from './lib/env.js';
 import { prisma } from './lib/prisma.js';
+import { conversationsRouter } from './routes/conversations.js';
 
 const app = express();
 
@@ -28,10 +29,10 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// --- маршруты будут подключаться здесь по мере готовности этапов ---
-// app.use('/api/conversations', conversationsRouter);
-// app.use('/api/uploads', uploadsRouter);
-// app.use('/api/admin', adminRouter);
+// --- публичное API ---
+app.use('/api/conversations', conversationsRouter);
+// app.use('/api/uploads', uploadsRouter);   // Этап 3
+// app.use('/api/admin', adminRouter);        // Этап 4
 
 // --- 404 для неизвестных /api ---
 app.use('/api', (_req, res) => {
