@@ -1,0 +1,7 @@
+# Локальная разработка: docker compose автоматически подхватывает этот файл
+# (когда -f не указан явно). Публикует сайт на http://localhost:8080.
+# В проде он НЕ используется — там явно передаются -f docker-compose.yml -f docker-compose.prod.yml.
+services:
+  web:
+    ports:
+      - '${WEB_PORT:-8080}:80'
