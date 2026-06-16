@@ -11,6 +11,10 @@ cd "$(dirname "$0")/.."
 : "${PUBLIC_IP:?нужно задать PUBLIC_IP (внешний IP сервера)}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@nova.local}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -base64 12)}"
+# порт HTTPS снаружи (443 по умолчанию; на этом сервере 8443, т.к. 443 занят VPN)
+HTTPS_PORT="${HTTPS_PORT:-8443}"
+# базовый публичный URL с портом (если 443 — порт не добавляем)
+if [ "$HTTPS_PORT" = "443" ]; then BASE="https://${PUBLIC_IP}"; else BASE="https://${PUBLIC_IP}:${HTTPS_PORT}"; fi
 
 rand() { openssl rand -hex "$1"; }
 
@@ -26,8 +30,9 @@ POSTGRES_DB=nova
 JWT_SECRET=$(rand 32)
 IP_HASH_SALT=$(rand 16)
 
-CORS_ORIGINS=https://${PUBLIC_IP}
-ADMIN_URL=https://${PUBLIC_IP}/admin.html
+CORS_ORIGINS=${BASE}${SERVER_HOST:+,https://${SERVER_HOST}:${HTTPS_PORT}}
+ADMIN_URL=${BASE}/admin.html
+HTTPS_PORT=${HTTPS_PORT}
 
 ADMIN_EMAIL=${ADMIN_EMAIL}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
@@ -55,12 +60,14 @@ fi
 mkdir -p deploy/certs
 if [ ! -f deploy/certs/fullchain.pem ]; then
   echo "→ генерирую self-signed сертификат для IP ${PUBLIC_IP} (10 лет)"
+  SAN="IP:${PUBLIC_IP}"
+  [ -n "${SERVER_HOST:-}" ] && SAN="${SAN},DNS:${SERVER_HOST}"
   openssl req -x509 -newkey rsa:2048 -nodes \
     -keyout deploy/certs/privkey.pem \
     -out deploy/certs/fullchain.pem \
     -days 3650 \
     -subj "/CN=${PUBLIC_IP}" \
-    -addext "subjectAltName=IP:${PUBLIC_IP}"
+    -addext "subjectAltName=${SAN}"
 else
   echo "→ сертификат уже есть, пропускаю"
 fi
@@ -70,5 +77,5 @@ echo "→ поднимаю прод-стек"
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 echo
-echo "✅ Готово. Открой https://${PUBLIC_IP}  (браузер 1 раз предупредит про self-signed — это ок)"
-echo "   Админка: https://${PUBLIC_IP}/admin.html"
+echo "✅ Готово. Открой ${BASE}  (браузер 1 раз предупредит про self-signed — это ок)"
+echo "   Админка: ${BASE}/admin.html"
