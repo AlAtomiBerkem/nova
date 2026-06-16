@@ -25,3 +25,6 @@ npm-debug.log*
 
 # prisma
 backend/prisma/*.db
+
+# сертификаты / ключи TLS — не коммитим
+deploy/certs/
